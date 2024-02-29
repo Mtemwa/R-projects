@@ -1,0 +1,80 @@
+
+# segment_analysis.R
+
+# Load necessary libraries
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+library(DT)
+
+# Load data management functions
+source("data_management.R")
+
+# Function to generate insights for specific segments or products
+generate_segment_insights <- function(segment_id) {
+  # Fetch segment data from the database based on segment_id
+  query <- sprintf("SELECT * FROM portfolio_data WHERE segment_id = '%s'", segment_id) # Example query, adjust based on actual data structure
+  segment_data <- fetch_data(query)
+  
+  # Clean and preprocess data
+  segment_data <- clean_data(segment_data)
+  
+  # Calculate key performance indicators (KPIs) for the segment
+  segment_performance <- segment_data %>%
+    summarise(
+      total_premium_income = sum(premium_income),
+      average_loss_ratio = mean(loss_ratio),
+      average_expense_ratio = mean(expense_ratio)
+    )
+  
+  # Return the calculated KPIs
+  return(segment_performance)
+}
+
+# Function to create a segment analysis dashboard
+create_segment_dashboard <- function(segment_performance, segment_id) {
+  ui <- fluidPage(
+    titlePanel(paste("Segment Analysis Dashboard -", segment_id)),
+    sidebarLayout(
+      sidebarPanel(
+        h3("Segment KPIs"),
+        verbatimTextOutput("kpiDisplay")
+      ),
+      mainPanel(
+        tabsetPanel(
+          tabPanel("Performance Overview", plotlyOutput("performancePlot")),
+          tabPanel("Data Table", DTOutput("dataTable"))
+        )
+      )
+    )
+  )
+  
+  server <- function(input, output) {
+    output$kpiDisplay <- renderPrint({
+      segment_performance
+    })
+    
+    output$performancePlot <- renderPlotly({
+      # Example plot - adjust based on actual KPIs and desired visualizations
+      p <- ggplot(segment_performance, aes(x = total_premium_income, y = average_loss_ratio)) +
+        geom_point() +
+        theme_minimal() +
+        labs(title = paste("Segment Performance Overview -", segment_id), x = "Total Premium Income", y = "Average Loss Ratio")
+      ggplotly(p)
+    })
+    
+    output$dataTable <- renderDT({
+      datatable(segment_data, options = list(pageLength = 5))
+    })
+  }
+  
+  # Run the Shiny app
+  shinyApp(ui = ui, server = server)
+}
+
+# Example usage
+segment_id <- "SEG001" # Example segment ID, adjust based on actual segment identifiers
+segment_performance <- generate_segment_insights(segment_id)
+create_segment_dashboard(segment_performance, segment_id)
+
